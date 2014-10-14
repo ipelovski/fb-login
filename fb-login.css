@@ -1,0 +1,25 @@
+.locked-content {
+  opacity: 0.5;
+}
+.locked {
+  position: relative;
+}
+.unlocked {
+  opacity: 1;
+}
+.overlay {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  z-index: 100;
+  /*background: rgb(0,0,0);
+  background: rgba(0,0,0,0.5);*/
+  margin: 0.5em;
+  text-align: center;
+}
+.fb-login-button {
+  top: 50%;
+  transform: translateY(-50%);
+}
