@@ -4,13 +4,40 @@
 <title>Facebook Login JavaScript Example</title>
 <meta charset="UTF-8">
 <link rel="stylesheet" type="text/css" href="fb-login.css">
+<link rel="stylesheet" type="text/css" href="sc-btn.css">
 <script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+<script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/jquery-cookie/1.4.1/jquery.cookie.min.js"></script>
 <script src="jquery.ba-resize.js"></script>
+<!-- <script id="facebook-jssdk" type="text/javascript" src="//connect.facebook.net/en_US/sdk.js"></script> -->
 <script type="text/javascript" src="fb-login.js"></script>
+  <script type="text/javascript">    
+    $.fbRepo.init('668806603233882');
+    $(function () {
+      $('.lockable').lockable();
+      $('.status').subscribe();
+      $('.sc-btn').fbLogin();
+    });
+  </script>
 </head>
 <body>
-  <fb:login-button scope="public_profile,email" autologoutlink="true">
-  </fb:login-button>
+  <div>
+    <a href="#" class="bold-btn sc-btn sc--facebook sc--tiny">
+      <span class="sc-icon">
+          <svg viewBox="0 0 33 33" width="25" height="25" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><g><path d="M 17.996,32L 12,32 L 12,16 l-4,0 l0-5.514 l 4-0.002l-0.006-3.248C 11.993,2.737, 13.213,0, 18.512,0l 4.412,0 l0,5.515 l-2.757,0 c-2.063,0-2.163,0.77-2.163,2.209l-0.008,2.76l 4.959,0 l-0.585,5.514L 18,16L 17.996,32z"></path></g></svg>
+      </span>
+      <span class="sc-text"></span>
+    </a>
+  </div>
+  <!-- <fb:login-button scope="public_profile,email" autologoutlink="true">
+  </fb:login-button> -->
+  <div class="status hidden">
+    <div class="status-message">
+    </div>
+    <div id="permissionContainer" class="permissions-container">
+      Yes, please send me newsletter ( <a href="javascript:void(0);" onclick="alert('bla bla bla');">Terms</a> ): <input id="permission" class="newsletter-option" type="checkbox" /><br />
+      Yes, please send me offers ( <a href="javascript:void(0);" onclick="alert('bla bla bla');">Terms</a> ): <input id="permission2" class="offers-option" type="checkbox" />
+    </div>
+  </div>
   <div id="widget1" class="lockable">
     <div id="base" class="quizz-container" data-width="400px" data-height="auto" data-auto-redirect="true" data-quiz="23158"></div>
     <script src="//dcc4iyjchzom0.cloudfront.net/widget/loader.js" async></script>
@@ -32,26 +59,5 @@
       </div>
     </div>
   </div>
-
-  <div class="status hidden" id="" style="background:white; margin-top:100px;">
-    <fb:login-button class="status-button" id="loginbtn" data-size="medium" autologoutlink="true" scope="public_profile,email">
-    </fb:login-button>
-    <div class="status-unknown">
-      Please log into Facebook.
-    </div>
-    <div class="status-not-authorized">
-      Please log into this app.
-    </div>
-    <div class="status-connected">
-      <div id="permissionContainer" class="permissions-container">
-        Yes, please send me newsletter ( <a href="javascript:void(0);" onclick="alert('bla bla bla');">Terms</a> ): <input id="permission" class="newsletter-option" type="checkbox" /><br />
-        Yes, please send me offers ( <a href="javascript:void(0);" onclick="alert('bla bla bla');">Terms</a> ): <input id="permission2" class="offers-option" type="checkbox" />
-      </div>
-    </div>
-  </div>
-  <script type="text/javascript">
-    $('.lockable').lockable();
-    $('.status').subscribe();
-  </script>
 </body>
 </html>

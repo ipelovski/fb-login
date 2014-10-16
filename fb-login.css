@@ -27,8 +27,8 @@
   /* Width and height are set explicitely because of annoying
   jumping of the login button when one logs in.
   It seems a part of the button is resized during that moment. */
-  width: 125px;
-  height: 39px;
+  /*width: 125px;
+  height: 39px;*/
   /* This is needed in order not see the white background of the body.
   And it should stay before the next property. */
   /*opacity: 1;*/
@@ -40,4 +40,7 @@
 }
 .hidden {
   display: none;
+}
+.bold-btn {
+  font-weight: bold !important;
 }

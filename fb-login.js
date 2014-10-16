@@ -4,61 +4,71 @@
 
   // widget for email subscriptions
   (function () {
-    var StatusClassNames = {
-      'connected': 'status-connected',
-      'not_authorized': 'status-not-authorized',
-      'unknown': 'status-unknown'
-    };
-    var StatusClassNamesArray = ['status-connected', 'status-not-authorized', 'status-unknown'];
-    var fbid, fbEmail;
-    var checkUserUrl = 'http://simulation.dk/other/sumo/checkUser.php';
-
-    $.fn.subscribe = function () {
+    $.fn.subscribe = function (options) {
       function initContainer(status) {
         return function (idx, elem) {
           var container = $(elem);
-          for (var i = 0; i < StatusClassNamesArray.length; i++) {
-            container.find('.' + StatusClassNamesArray[i]).hide();
+          // finds the container of the checkboxes and hides it
+          var optionsContainer = container.find(settings.options);
+          optionsContainer.hide();
+          if (!status) {
+            return;
           }
-          var className = StatusClassNames[status];
-          container.find('.' + className).show();
+          if (status === 'connected') {
+            // if the user is logged in then show the checkboxes
+            optionsContainer.show();
+          }
+          var message;
+          if (status === 'connected') {
+            message = settings.loginMessage;
+          }
+          else if (status === 'not_authorized') {
+            message = settings.notAuthorizeMessage;
+          }
+          else {
+            message = settings.notLoggedinMessage;
+          }
+          // finds the container of the messages and hides it
+          var messageContainer = container.find(settings.message);
+          // if the user is not logged in show the proper message
+          messageContainer.text(message);
+          messageContainer.show();
         };
       }
-      var self = this;
-      $().fbRepo().on('fbStatusChanged', function (e, response) {
-        self.each(initContainer(response.status)).removeClass('hidden');
-      });
-      return this.each(initContainer(''));
-    };
-
-    function updateStatusWidget(status) {
-      FB.api('/me?fields=id,email,gender,age_range', function (response) {
-        fbid = response.id;
-        fbEmail = response.email;
-        $.getJSON(checkUserUrl + '?op=0&id=' + fbid, function (data) {
-          var permissionsContainer = $('.permissions-container');
-          permissionsContainer.show();
-          permissionsContainer.find('.newsletter-option').prop('checked', data !== 0);
-          permissionsContainer.find('.offers-option').prop('checked', data !== 0);
+      function initOptions() {
+        self.find(settings.newsletter).change(function () {
+          $.fbRepo.subscribeNewsletter(this.checked);
         });
-
-        // $.get('checkUser.php?op=1&id=' + fbid + '&val=' + (this.checked ? 1 : 0), function (data) {
-        //   // Something
-        // });
+        self.find(settings.offers).change(function () {
+          $.fbRepo.subscribeOffers(this.checked);
+        });
+      }
+      var self = this;
+      var settings = $.extend($.fn.subscribe.default, options);
+      $(document).on('fbStatusChanged', function (e, response) {
+        self.each(initContainer(response.status)).show();
+        if (response.status === 'connected') {
+          $.fbRepo.getUserDetails()
+            .then(function (data) {
+              self.find(settings.newsletter).prop('checked', data !== 0);
+              self.find(settings.offers).prop('checked', data !== 0);
+              initOptions();
+            });
+        }
       });
-    }
-  }());
 
-  window.fbAsyncInit = function () {
-    FB.init({
-      appId      : '668806603233882', //'823531907664969',
-      cookie     : true,  // enable cookies to allow the server to access 
-                          // the session
-      xfbml      : true,  // parse social plugins on this page
-      version    : 'v2.1', // use version 2.1
-      status: true // the SDK will attempt to get info about the current user immediately after init
-    });
-  };
+      return this.each(initContainer(null));
+    };
+    $.fn.subscribe.default = {
+      notLoggedinMessage: 'Please log into Facebook.',
+      notAuthorizeMessage: 'Please log into this app.',
+      loginMessage: 'You are logged in.',
+      options: '.permissions-container',
+      newsletter: '.newsletter-option',
+      offers: '.offers-option',
+      message: '.status-message'
+    };
+  }());
 
   // Load the SDK asynchronously
   (function(d, s, id) {
@@ -71,33 +81,130 @@
 
   // fb repository implemented as a jQuery plugin
   (function () {
-    var fbRepo = $({});
-    var oldfbAsyncInit = window.fbAsyncInit;
+    var fbid, fbEmail;
+    var checkUserUrl = 'http://simulation.dk/other/sumo/checkUser.php';
+    var facebookIdCookieName = 'facebook-id';
+    var facebookEmailCookieName = 'facebook-email';
     function fbStatusChangedHandler(response) {
-      fbRepo.trigger('fbStatusChanged', response);
-    }
-    window.fbAsyncInit = function () {
-      if (typeof oldfbAsyncInit === 'function') {
-        oldfbAsyncInit();
+      if (response.status !== 'connected') {
+        fbid = fbEmail = null;
+        $.removeCookie(facebookIdCookieName);
+        $.removeCookie(facebookEmailCookieName);
       }
-      FB.getLoginStatus(fbStatusChangedHandler);
+      else {
+        fbid = response.authResponse.userID;
+        $.cookie(facebookIdCookieName, fbid);
+      }
+      $(document).trigger('fbStatusChanged', response);
+    }
+    function fbInit(appId) {
+      FB.init({
+        appId      : appId, //'668806603233882', //'823531907664969',
+        cookie     : true,  // enable cookies to allow the server to access 
+                            // the session
+        xfbml      : true,  // parse social plugins on this page
+        version    : 'v2.1', // use version 2.1
+        status: true // the SDK will attempt to get info about the current user immediately after init
+      });
+
+      var storedFacebookId = $.cookie(facebookIdCookieName);
+      if (storedFacebookId) {
+        fbStatusChangedHandler({
+          status: 'connected',
+          authResponse: {
+            userID: storedFacebookId
+          }
+        });
+      }
+      else {
+        FB.getLoginStatus(fbStatusChangedHandler);
+      }
       FB.Event.subscribe('auth.authResponseChange', fbStatusChangedHandler);
 
-      ['auth.login', 'auth.logout', 'auth.authResponseChange', 'auth.statusChange'].forEach(function (eventType) {
-        FB.Event.subscribe(eventType, function (response) {
-          console.log(eventType);
-        });
-      });
+      // ['auth.login', 'auth.logout', 'auth.authResponseChange', 'auth.statusChange'].forEach(function (eventType) {
+      //   FB.Event.subscribe(eventType, function (response) {
+      //     console.log(eventType);
+      //   });
+      // });
+    }
+    var oldEventData = null;
+    $.event.special.fbStatusChanged = {
+      add: function (handleObj) {
+        if (oldEventData) {
+          handleObj.handler(oldEventData.event, oldEventData.data);
+        }
+      },
+      trigger: function (event, data) {
+        oldEventData = { event: event, data: data };
+      }
     };
-    $.fn.fbRepo = function () {
-      return fbRepo;
+    var fbRepo = {
+      init: function (appId) {
+        if (typeof FB !== 'undefined') {
+          fbInit(appId);
+        }
+        else {
+          window.fbAsyncInit = function () {
+            fbInit(appId);
+          };
+        }
+      },
+      getUserDetails: function () {
+        function retrieveSubscription() {
+          $.getJSON(checkUserUrl + '?op=0&id=' + fbid, function (data) {
+            deferred.resolve(data);
+          });
+        }
+        var deferred = $.Deferred();
+        var storedFacebookEmail = $.cookie(facebookEmailCookieName);
+        if (storedFacebookEmail) {
+          fbEmail = storedFacebookEmail;
+          retrieveSubscription();
+        }
+        else {
+          FB.api('/me?fields=id,email,gender,age_range', function (response) {
+            //fbid = response.id;
+            fbEmail = response.email;
+            $.cookie(facebookEmailCookieName, fbEmail);
+            retrieveSubscription();
+          });
+        }
+        return deferred;
+      },
+      subscribeNewsletter: function (subscribe) {
+        if (!fbid) {
+          var deferred = $.Deferred();
+          deferred.reject(new Error('Unknown Facebook ID.'));
+          return deferred;
+        }
+        else {
+          return $.get(checkUserUrl + '?op=1&id=' + fbid + '&val=' + (subscribe ? 1 : 0));
+        }
+      },
+      subscribeOffers: function (subscribe) {
+        if (!fbid) {
+          var deferred = $.Deferred();
+          deferred.reject(new Error('Unknown Facebook ID.'));
+          return deferred;
+        }
+        else {
+          return $.get(checkUserUrl + '?op=1&id=' + fbid + '&val=' + (subscribe ? 1 : 0));
+        }
+      },
     };
+    $.fbRepo = fbRepo;
   }());
 
   // overlay widget
   (function () {
     // onlogin="checkLoginState();"
-    var fbButtonTemplate = '<fb:login-button class="fb-login-button-xlarge" data-size="xlarge" scope="public_profile,email"></fb:login-button>';
+    //var fbButtonTemplate = '<fb:login-button class="fb-login-button-xlarge" data-size="xlarge" scope="public_profile,email"></fb:login-button>';
+    var fbButtonTemplate = '<a href="#" class="fb-login-button-xlarge bold-btn sc-btn sc--facebook sc--large">' +
+      '<span class="sc-icon">' +
+          '<svg viewBox="0 0 33 33" width="25" height="25" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><g><path d="M 17.996,32L 12,32 L 12,16 l-4,0 l0-5.514 l 4-0.002l-0.006-3.248C 11.993,2.737, 13.213,0, 18.512,0l 4.412,0 l0,5.515 l-2.757,0 c-2.063,0-2.163,0.77-2.163,2.209l-0.008,2.76l 4.959,0 l-0.585,5.514L 18,16L 17.996,32z"></path></g></svg>' +
+      '</span>' +
+      '<span class="sc-text"></span>' +
+    '</a>';
 
     function widgetsInit(loggedIn) {
       var lockableContent = $('.lockable-content');
@@ -116,9 +223,14 @@
           var overlay = $('<div/>').addClass('overlay');
           overlay.height(widget.height());
           overlay.width(widget.width());
-          overlay.append(fbButtonTemplate);
-          FB.XFBML.parse(overlay[0]);
+          
           container.append(overlay);
+          // TODO the widgets are too slow to load
+          setTimeout(function () {
+            overlay.append(fbButtonTemplate);
+            // FB.XFBML.parse(overlay[0]);
+            overlay.find('.sc-btn').fbLogin();
+          }, 100);
         });
 
         lockableContent.resize(function (e) {
@@ -131,19 +243,14 @@
           var left = offset.left + "px";
 
           container.find('.overlay').css({
-            // 'background-color': 'rgba(0, 0, 0, 0.70)',
-            // 'position': 'absolute',
-            // 'left': left,
-            // 'top': top,
             'width': width,
             'height': height,
-            // 'z-index': 100
           });
-        });//.resize();
+        });
       }
     }
     $.fn.lockable = function () {
-      $().fbRepo().on('fbStatusChanged', function (e, response) {
+      $(document).on('fbStatusChanged', function (e, response) {
         var loggedIn = response.status === 'connected';
         widgetsInit(loggedIn);
       });
@@ -154,6 +261,28 @@
           container.find('> :first-child').addClass('lockable-content');
         }
       });
+    };
+  }());
+  // custom facebook login buttons
+  (function () {
+    $.fn.fbLogin = function () {
+      var self = this;
+      var loggedIn = false;
+      $(document).on('fbStatusChanged', function (e, response) {
+        loggedIn = response.status === 'connected';
+        var text = loggedIn ? 'Log Out' : 'Log In';
+        $(self.selector).find('.sc-text').text(text);
+      });
+      this.on('click', function (e) {
+        e.preventDefault();
+        if (!loggedIn) {
+          FB.login(null, { scope: 'public_profile,email' });
+        }
+        else {
+          FB.logout();
+        }
+      });
+      return this;
     };
   }());
 }(jQuery));
