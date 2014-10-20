@@ -2,6 +2,16 @@
 (function ($) {
   "use strict";
 
+  // utilities
+  (function () {
+    $.fn.visible = function () {
+      return this.css('visibility', 'visible');
+    };
+    $.fn.invisible = function () {
+      return this.css('visibility', 'hidden');
+    };
+  }());
+
   // widget for email subscriptions
   (function () {
     $.fn.subscribe = function (options) {
@@ -44,9 +54,9 @@
         });
       }
       var self = this;
-      var settings = $.extend($.fn.subscribe.default, options);
+      var settings = $.extend($.fn.subscribe.defaultOptions, options);
       $(document).on('fbStatusChanged', function (e, response) {
-        self.each(initContainer(response.status)).show();
+        self.each(initContainer(response.status)).visible();
         if (response.status === 'connected') {
           $.fbRepo.getUserDetails()
             .then(function (data) {
@@ -59,7 +69,7 @@
 
       return this.each(initContainer(null));
     };
-    $.fn.subscribe.default = {
+    $.fn.subscribe.defaultOptions = {
       notLoggedinMessage: 'Please log into Facebook.',
       notAuthorizeMessage: 'Please log into this app.',
       loginMessage: 'You are logged in.',
@@ -81,25 +91,26 @@
 
   // fb repository implemented as a jQuery plugin
   (function () {
-    var fbid, fbEmail;
+    var fbid, fbEmail, fbToken;
     var checkUserUrl = 'http://simulation.dk/other/sumo/checkUser.php';
     var facebookIdCookieName = 'facebook-id';
     var facebookEmailCookieName = 'facebook-email';
     function fbStatusChangedHandler(response) {
       if (response.status !== 'connected') {
-        fbid = fbEmail = null;
+        fbid = fbEmail = fbToken = null;
         $.removeCookie(facebookIdCookieName);
         $.removeCookie(facebookEmailCookieName);
       }
       else {
         fbid = response.authResponse.userID;
+        fbToken = response.authResponse.accessToken;
         $.cookie(facebookIdCookieName, fbid);
       }
       $(document).trigger('fbStatusChanged', response);
     }
     function fbInit(appId) {
       FB.init({
-        appId      : appId, //'668806603233882', //'823531907664969',
+        appId      : appId,
         cookie     : true,  // enable cookies to allow the server to access 
                             // the session
         xfbml      : true,  // parse social plugins on this page
@@ -107,18 +118,18 @@
         status: true // the SDK will attempt to get info about the current user immediately after init
       });
 
-      var storedFacebookId = $.cookie(facebookIdCookieName);
-      if (storedFacebookId) {
-        fbStatusChangedHandler({
-          status: 'connected',
-          authResponse: {
-            userID: storedFacebookId
-          }
-        });
-      }
-      else {
-        FB.getLoginStatus(fbStatusChangedHandler);
-      }
+      // var storedFacebookId = $.cookie(facebookIdCookieName);
+      // if (storedFacebookId) {
+      //   fbStatusChangedHandler({
+      //     status: 'connected',
+      //     authResponse: {
+      //       userID: storedFacebookId
+      //     }
+      //   });
+      // }
+      // else {
+      FB.getLoginStatus(fbStatusChangedHandler);
+      // }
       FB.Event.subscribe('auth.authResponseChange', fbStatusChangedHandler);
 
       // ['auth.login', 'auth.logout', 'auth.authResponseChange', 'auth.statusChange'].forEach(function (eventType) {
@@ -138,6 +149,9 @@
         oldEventData = { event: event, data: data };
       }
     };
+    function buildUrl(data) {
+      return checkUserUrl + '?' + $.param(data);
+    }
     var fbRepo = {
       init: function (appId) {
         if (typeof FB !== 'undefined') {
@@ -151,7 +165,11 @@
       },
       getUserDetails: function () {
         function retrieveSubscription() {
-          $.getJSON(checkUserUrl + '?op=0&id=' + fbid, function (data) {
+          $.getJSON(buildUrl({
+            op: 0,
+            id: fbid,
+            token: fbToken
+          }), function (data) {
             deferred.resolve(data);
           });
         }
@@ -178,7 +196,12 @@
           return deferred;
         }
         else {
-          return $.get(checkUserUrl + '?op=1&id=' + fbid + '&val=' + (subscribe ? 1 : 0));
+          return $.get(buildUrl({
+            op: 1,
+            id: fbid,
+            token: fbToken,
+            val: (subscribe ? 1 : 0)
+          }));
         }
       },
       subscribeOffers: function (subscribe) {
@@ -188,7 +211,12 @@
           return deferred;
         }
         else {
-          return $.get(checkUserUrl + '?op=1&id=' + fbid + '&val=' + (subscribe ? 1 : 0));
+          return $.get(buildUrl({
+            op: 1,
+            id: fbid,
+            token: fbToken,
+            val: (subscribe ? 1 : 0)
+          }));
         }
       },
     };
@@ -225,12 +253,19 @@
           overlay.width(widget.width());
           
           container.append(overlay);
-          // TODO the widgets are too slow to load
-          setTimeout(function () {
-            overlay.append(fbButtonTemplate);
-            // FB.XFBML.parse(overlay[0]);
-            overlay.find('.sc-btn').fbLogin();
-          }, 100);
+          // we test every widget until it is loaded
+          var interval = setInterval(function () {
+            // The loaded widget and its overlay are expected to be bigger than 100px x 100px
+            // The overlay dimensions are tested
+            // since they might be updated a few milliseconds after the widget is resized.
+            if (overlay.height() > 100 && overlay.width() > 100) {
+              overlay.append(fbButtonTemplate);
+              // FB.XFBML.parse(overlay[0]);
+              overlay.find('.sc-btn').fbLogin();
+              clearInterval(interval);
+            }
+          }, 50);
+          // overlay.append('<iframe src="about:blank"></iframe>');
         });
 
         lockableContent.resize(function (e) {
@@ -268,10 +303,12 @@
     $.fn.fbLogin = function () {
       var self = this;
       var loggedIn = false;
+      this.invisible();
       $(document).on('fbStatusChanged', function (e, response) {
         loggedIn = response.status === 'connected';
         var text = loggedIn ? 'Log Out' : 'Log In';
         $(self.selector).find('.sc-text').text(text);
+        self.visible();
       });
       this.on('click', function (e) {
         e.preventDefault();

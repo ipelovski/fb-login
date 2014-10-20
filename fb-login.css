@@ -19,6 +19,15 @@
   /*margin: 0.5em;*/
   text-align: center;
 }
+.overlay iframe {
+  border: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 100%;
+  z-index: -1;;
+}
 .fb-login-button-xlarge {
   /* This centers the login button vertically. */
   top: 50%;
@@ -39,7 +48,7 @@
   /*-webkit-transform-style: preserve-3d;*/
 }
 .hidden {
-  display: none;
+  visibility: hidden;
 }
 .bold-btn {
   font-weight: bold !important;
