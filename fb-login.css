@@ -16,36 +16,12 @@
   z-index: 100;
   background: rgb(0,0,0);
   background: rgba(0,0,0,0.15);
-  /*margin: 0.5em;*/
   text-align: center;
-}
-.overlay iframe {
-  border: none;
-  position: absolute;
-  top: 0;
-  left: 0;
-  height: 100%;
-  width: 100%;
-  z-index: -1;;
 }
 .fb-login-button-xlarge {
   /* This centers the login button vertically. */
   top: 50%;
   transform: translateY(-50%);
-  /*overflow: hidden;*/
-  /* Width and height are set explicitely because of annoying
-  jumping of the login button when one logs in.
-  It seems a part of the button is resized during that moment. */
-  /*width: 125px;
-  height: 39px;*/
-  /* This is needed in order not see the white background of the body.
-  And it should stay before the next property. */
-  /*opacity: 1;*/
-  /* There is a flickering when one logs in.
-  It seems a problem of webkit.
-  Found this solution on
-  http://nathanhoad.net/how-to-stop-css-animation-flicker-in-webkit */
-  /*-webkit-transform-style: preserve-3d;*/
 }
 .hidden {
   visibility: hidden;
