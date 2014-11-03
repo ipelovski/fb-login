@@ -1,4 +1,4 @@
-/* global FB */
+/* global FB,History */
 (function ($) {
   "use strict";
 
@@ -518,6 +518,73 @@
        * @type {String}
        */
       text: '.sc-text'
+    };
+  }());
+
+  /**
+   * Widget for changing the page URL on scrolling to a specific element
+   */
+  (function () {
+    /**
+     * The handler invoked when a waypoint element is visible.
+     * "this" points to that waypoint element.
+     */
+    function waypointHandler() {
+      var data = null;
+      var url = $(this).data('url');
+      var title = url;
+      History.pushState(data, title, url);
+    }
+
+    /**
+     * Options for the waypoint plugin.
+     * These options will make a waypoint to be active
+     * when its top moves to the top half of the screen.
+     * Useful when scrolling down.
+     * @type {Object}
+     */
+    var waypointTopOptions = {
+      continuous: false, // it will trigger the handler if it is the last waypoint
+      offset: '50%',
+      handler: waypointHandler
+    };
+    /**
+     * Options for the waypoint plugin.
+     * These options will make a waypoint to be active
+     * when its bottom moves to the bottom half of the screen.
+     * Useful when scrolling up.
+     * @type {Object}
+     */
+    var waypointBottomOptions = {
+      continuous: false,
+      offset: function () {
+        // once the bottom of an element moves below the middle of the screen
+        // then switch to the waypoint of that element
+        var contextHeight = $.waypoints('viewportHeight');
+        return contextHeight / 2 - $(this).outerHeight();
+      },
+      handler: waypointHandler
+    };
+
+    $.fn.fb_scroll = function () {
+      var selector = this.selector;
+      /**
+       * Initialzes the waypoint plugin with the plugin selector.
+       */
+      var init = function () {
+        $(selector).waypoint(waypointTopOptions);
+        $(selector).waypoint(waypointBottomOptions);
+      };
+      /**
+       * The waypoint plugin does not recalculate the offset on window resize,
+       * so it is recalculated manually.
+       */
+      $(window).resize(function () {
+        $(selector).waypoint('destroy');
+        init();
+      });
+      init();
+      return this;
     };
   }());
 }(jQuery));
