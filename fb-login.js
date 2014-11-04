@@ -571,19 +571,8 @@
       /**
        * Initialzes the waypoint plugin with the plugin selector.
        */
-      var init = function () {
-        $(selector).waypoint(waypointTopOptions);
-        $(selector).waypoint(waypointBottomOptions);
-      };
-      /**
-       * The waypoint plugin does not recalculate the offset on window resize,
-       * so it is recalculated manually.
-       */
-      $(window).resize(function () {
-        $(selector).waypoint('destroy');
-        init();
-      });
-      init();
+      $(selector).waypoint(waypointTopOptions);
+      $(selector).waypoint(waypointBottomOptions);
       return this;
     };
   }());
