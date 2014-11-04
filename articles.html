@@ -16,7 +16,8 @@
 <script type="text/javascript" src="fb-login.js"></script>
 <script type="text/javascript">
   $(function () {
-    var baseUrl = 'http://localhost:7457/articles.html/article';
+    //var baseUrl = 'http://localhost:7457/articles.html/article';
+    var baseUrl = 'http://simulation.dk/other/sumo/sandbox/articles.html/article';
     $('article').each(function (idx, elem) {
       var $elem = $(elem);
       $elem.data('url', baseUrl + (idx + 1));
