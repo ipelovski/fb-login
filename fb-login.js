@@ -550,7 +550,7 @@
         share.attr(dataAttribute, $elem.attr(dataAttribute));
       });
       // sets the text of the button
-      share.html('Del ' + title);
+      $.fn.fb_scroll.defaultOptions.shareButtonText(share, title);
     }
 
     /**
@@ -603,7 +603,15 @@
        * The jQuery selector for the share button.
        * @type {String}
        */
-      shareButton: '#share'
+      shareButton: '#share',
+      /**
+       * Sets the given text to the share button
+       * @param  {jQuery} shareButton
+       * @param  {String} text
+       */
+      shareButtonText: function (shareButton, text) {
+        shareButton.html('Del ' + text);
+      }
     };
   }());
 }(jQuery));
