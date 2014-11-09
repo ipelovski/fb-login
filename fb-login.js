@@ -526,14 +526,31 @@
    */
   (function () {
     /**
+     * Data attributes to be copied to the share button
+     * @type {Array}
+     */
+    var dataAttributes = ['url', 'title', 'image', 'description'];
+    /**
      * The handler invoked when a waypoint element is visible.
      * "this" points to that waypoint element.
      */
     function waypointHandler() {
+      var $elem = $(this);
       var data = null;
-      var url = $(this).data('url');
-      var title = url;
+      var url = $elem.data('url');
+      var title = $elem.data('title');
+      // changes the URL of the page
       History.pushState(data, title, url);
+
+      // copies data attributes to the sahre button
+      // from the currently visible article
+      var share = $($.fn.fb_scroll.defaultOptions.shareButton);
+      $.each(dataAttributes, function (index, attribute) {
+        var dataAttribute = 'data-' + attribute;
+        share.attr(dataAttribute, $elem.attr(dataAttribute));
+      });
+      // sets the text of the button
+      share.html('Del ' + title);
     }
 
     /**
@@ -574,6 +591,19 @@
       $(selector).waypoint(waypointTopOptions);
       $(selector).waypoint(waypointBottomOptions);
       return this;
+    };
+
+    /**
+     * The default options for the widget.
+     * They cannot be overwritten for each instance of the widget.
+     * @type {Object}
+     */
+    $.fn.fb_scroll.defaultOptions = {
+      /**
+       * The jQuery selector for the share button.
+       * @type {String}
+       */
+      shareButton: '#share'
     };
   }());
 }(jQuery));

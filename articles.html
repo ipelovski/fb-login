@@ -12,16 +12,25 @@
     margin-left: auto;
     margin-right: auto;
   }
+  .share {
+    position: fixed;
+    bottom: 0;
+  }
 </style>
 <script type="text/javascript" src="fb-login.js"></script>
 <script type="text/javascript">
   $(function () {
-    //var baseUrl = 'http://localhost:7457/articles.html/article';
-    var baseUrl = 'http://simulation.dk/other/sumo/sandbox/articles.html/article';
+    var baseUrl = 'http://localhost:7457/articles.html/article';
+    // var baseUrl = 'http://simulation.dk/other/sumo/sandbox/articles.html/article';
     $('article').each(function (idx, elem) {
       var $elem = $(elem);
-      $elem.data('url', baseUrl + (idx + 1));
-      $elem.append($('<h3>').text('Article ' + (idx + 1)));
+      var index = idx + 1;
+      $elem.attr('data-url', baseUrl + index);
+      var title = 'Article ' + index;
+      $elem.attr('data-title', title);
+      $elem.attr('data-image', 'image-url-' + index);
+      $elem.attr('data-description', 'article description ' + index);
+      $elem.append($('<h3>').text(title));
       [1, 2, 3, 4].forEach(function () {
         $elem.append($('<p>').text('Lorem ipsum dolor sit amet, consectetur adipiscing elit. Curabitur fermentum eros purus, in aliquet velit posuere sed. Phasellus pretium libero erat. Nunc et aliquam mauris. Donec suscipit leo sed diam commodo, quis ultrices lectus rutrum. Aliquam tellus est, tristique fringilla justo non, cursus pretium enim. Sed porta leo pharetra purus bibendum, at facilisis diam auctor. Morbi rutrum, tortor et dictum mattis, leo felis vulputate dui, vel sodales elit quam sit amet purus. Proin bibendum non mi nec volutpat. Curabitur vulputate ut velit at commodo.'));
       });
@@ -39,5 +48,6 @@
   </article>
   <article>
   </article>
+  <button id="share" class="share"></button>
 </body>
 </html>
