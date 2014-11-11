@@ -578,7 +578,11 @@
         // once the bottom of an element moves below the middle of the screen
         // then switch to the waypoint of that element
         var contextHeight = $.waypoints('viewportHeight');
-        return contextHeight / 2 - $(this).outerHeight();
+        return contextHeight / 2 - ($(this).outerHeight(true) - 1);
+        // Because the offsets of top and bottom waypoints are the same
+        // the number 1 is substracted so they should differ
+        // and the top waypoint should take precedence (its offset should be bigger).
+        // Note: waypoints.js sorts the waypoints by their offsets
       },
       handler: waypointHandler
     };
