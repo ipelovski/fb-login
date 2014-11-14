@@ -201,14 +201,16 @@
      * @param  {String} appId - Facebook application id
      */
     function fbInit(appId) {
-      FB.init({
-        appId      : appId,
-        cookie     : true,  // enable cookies to allow the server to access 
-                            // the session
-        xfbml      : true,  // parse social plugins on this page
-        version    : 'v2.1', // use version 2.1
-        status: true // the SDK will attempt to get info about the current user immediately after init
-      });
+      if (appId) {
+        FB.init({
+          appId      : appId,
+          cookie     : true,  // enable cookies to allow the server to access 
+                              // the session
+          xfbml      : true,  // parse social plugins on this page
+          version    : 'v2.1', // use version 2.1
+          status: true // the SDK will attempt to get info about the current user immediately after init
+        });
+      }
 
       FB.getLoginStatus(fbStatusChangedHandler);
       FB.Event.subscribe('auth.authResponseChange', fbStatusChangedHandler);
@@ -245,7 +247,11 @@
         fbInit(appId);
       }
       else {
+        var old_fbAsyncInit = window.fbAsyncInit;
         window.fbAsyncInit = function () {
+          if (old_fbAsyncInit) {
+            old_fbAsyncInit();
+          }
           fbInit(appId);
         };
       }
@@ -454,13 +460,19 @@
    * Widget for custom Facebook login buttons implemented as a jQuery plugin.
    */
   (function () {
-    $.fn.fb_login = function () {
+    $.fn.fb_login = function (options) {
       var self = this;
       /**
        * Variable holding information whether the user is logged in.
        * @type {Boolean}
        */
       var loggedIn = false;
+
+      /**
+       * The settings for the specific instance of the widget.
+       * @type {Object}
+       */
+      var settings = $.extend($.fn.fb_login.defaultOptions, options);
 
       // Always hides the button at the beginning.
       // Makes sure the button does not pop in on loading, messing around the other elements.
@@ -471,12 +483,15 @@
        * The event handler initializes the widget and its components.
        */
       $(document).on(statusChangedEventName, function (e, response) {
-        var options = $.fn.fb_login.defaultOptions;
         loggedIn = response.status === 'connected';
         var optionName = loggedIn ? 'logout' : 'login';
-        var text = options[optionName];
+        var text = settings[optionName];
         // sets the proper text to the button ('Log In' or 'Log Out')
-        $(self.selector).find(options.text).text(text);
+        var textElement = $(self.selector);
+        if (settings.text) {
+          textElement = textElement.find(settings.text);
+        }
+        textElement.text(text);
         self.visible();
       });
 
@@ -498,7 +513,7 @@
 
     /**
      * The default options for the widget.
-     * They cannot be overwritten for seperate instances of the widget.
+     * They can be overwritten for seperate instances of the widget.
      * @type {Object}
      */
     $.fn.fb_login.defaultOptions = {
