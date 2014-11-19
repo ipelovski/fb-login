@@ -8,9 +8,9 @@ var concat = require('gulp-concat');
 gulp.task('default', ['js', 'css']);
 
 gulp.task('js', function () {
-  return gulp.src('fb-login.js')
+  return gulp.src('fb.js')
     .pipe(uglify())
-    .pipe(concat('fb-login.min.js'))
+    .pipe(concat('fb.min.js'))
     .pipe(gulp.dest('build'));
 });
 

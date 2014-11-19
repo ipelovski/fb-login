@@ -26,6 +26,39 @@
   var statusChangedEventName = 'fbStatusChanged';
 
   /**
+   * Calls a function to display a list of articles in the left side
+   * when the user login status is available.
+   */
+  (function () {
+    var fbid = null, lastFbid = null;
+    $(document).on(statusChangedEventName, function (e, response) {
+      if (response.status !== 'connected') {
+        fbid = null;
+        if (typeof window.create_articlelist === 'function') {
+          try {
+            window.create_articlelist();
+          }
+          catch (e) {}
+        }
+      }
+      else {
+        fbid = response.authResponse.userID;
+        if (fbid !== lastFbid) {
+          FB.api('/me', { fields: 'age_range,likes,interests,birthday' }, function (response) {
+            if (typeof window.create_articlelist === 'function') {
+              try {
+                window.create_articlelist(response.birthday, response.likes, response.interests);
+              }
+              catch (e) {}
+            }
+          });
+        }
+        lastFbid = fbid;
+      }
+    });
+  }());
+
+  /**
    * Widget for email subscriptions implemented as a jQuery plugin.
    */
   (function () {
@@ -87,15 +120,20 @@
       }
 
       /**
+       * The event handler called when the user checks or unchecks
+       * the option for subscribing to a newsletter.
+       */
+      function subscribeNewsletter() {
+        $.fb_subscriptions.subscribeNewsletter(this.checked);
+      }
+
+      /**
        * Adds event listeners to the checkboxes inside the widget.
        */
       function initOptions() {
-        self.find(settings.newsletter).change(function () {
-          $.fb_subscriptions.subscribeNewsletter(this.checked);
-        });
-        self.find(settings.offers).change(function () {
-          $.fb_subscriptions.subscribeOffers(this.checked);
-        });
+        self.find(settings.newsletter)
+          .off('change', subscribeNewsletter)
+          .on('change', subscribeNewsletter);
       }
 
       var self = this;
@@ -106,19 +144,27 @@
       var settings = $.extend($.fn.fb_subscribe.defaultOptions, options);
 
       /**
+       * Holds the previous status of the user login status.
+       * Used to avoid unnecessary AJAX calls and event bindings.
+       * @type {String}
+       */
+      var lastStatus = null;
+
+      /**
        * Adds an event listener for the event when the Facebook login status changes.
        * The event handler initializes the widget and its components.
        */
       $(document).on(statusChangedEventName, function (e, response) {
-        self.each(initContainer(response.status)).visible();
-        if (response.status === 'connected') {
+        var responseStatus = response.status;
+        self.each(initContainer(responseStatus)).visible();
+        if (responseStatus === 'connected' && responseStatus !== lastStatus) {
           $.fb_subscriptions.get()
-            .then(function (data) {
-              self.find(settings.newsletter).prop('checked', data !== 0);
-              self.find(settings.offers).prop('checked', data !== 0);
+            .then(function (subscribed) {
+              self.find(settings.newsletter).prop('checked', subscribed);
               initOptions();
             });
         }
+        lastStatus = responseStatus;
       });
 
       return this.each(initContainer(null));
@@ -178,7 +224,7 @@
    */
   (function () {
     var fbid, fbToken;
-    var checkUserUrl = 'http://simulation.dk/other/sumo/checkUser.php';
+    var checkUserUrl = 'http://digout.com/wp-admin/admin-ajax.php?action=my_subscriptions';
 
     /**
      * An event handler for the 'auth.authResponseChange'
@@ -242,23 +288,17 @@
      * @param  {String} appId - Facebook application id
      */
     $.fb_init = function (appId) {
-      // if the Facebook SDK is loaded synchronously
-      if (typeof FB !== 'undefined') {
+      var old_fbAsyncInit = window.fbAsyncInit;
+      window.fbAsyncInit = function () {
+        if (old_fbAsyncInit) {
+          old_fbAsyncInit();
+        }
         fbInit(appId);
-      }
-      else {
-        var old_fbAsyncInit = window.fbAsyncInit;
-        window.fbAsyncInit = function () {
-          if (old_fbAsyncInit) {
-            old_fbAsyncInit();
-          }
-          fbInit(appId);
-        };
-      }
+      };
     };
 
     function buildUrl(data) {
-      return checkUserUrl + '?' + $.param(data);
+      return checkUserUrl + '&' + $.param(data);
     }
 
     var fbEmail = null;
@@ -277,7 +317,7 @@
         deferred.resolve(fbEmail);
       }
       else {
-        FB.api('/me?fields=id,email,gender,age_range', function (response) {
+        FB.api('/me?fields=email', function (response) {
           fbEmail = response.email;
           deferred.resolve(fbEmail);
         });
@@ -314,10 +354,13 @@
         }
         else {
           return $.getJSON(buildUrl({
-            op: 0,
-            id: fbid,
-            token: fbToken
-          }));
+              op: 0,
+              id: fbid,
+              token: fbToken
+            }))
+            .then(function (data) {
+              return data.status === 'success' && data.permission === '1';
+            });
         }
       },
 
@@ -333,7 +376,7 @@
           return unknownUser();
         }
         else {
-          return $.get(buildUrl({
+          return $.post(buildUrl({
             op: 1,
             id: fbid,
             token: fbToken,
@@ -354,7 +397,7 @@
           return unknownUser();
         }
         else {
-          return $.get(buildUrl({
+          return $.post(buildUrl({
             op: 1,
             id: fbid,
             token: fbToken,
@@ -474,9 +517,20 @@
        */
       var settings = $.extend($.fn.fb_login.defaultOptions, options);
 
+      /**
+       * Sets the text inside of the login button.
+       */
+      var setText = function (text) {
+        var textElement = $(self.selector);
+        if (settings.text) {
+          textElement = textElement.find(settings.text);
+        }
+        textElement.html(text);
+      };
+
       // Always hides the button at the beginning.
       // Makes sure the button does not pop in on loading, messing around the other elements.
-      this.invisible();
+      setText(settings.unknown);
 
       /**
        * Adds an event listener for the event when the Facebook login status changes.
@@ -487,12 +541,7 @@
         var optionName = loggedIn ? 'logout' : 'login';
         var text = settings[optionName];
         // sets the proper text to the button ('Log In' or 'Log Out')
-        var textElement = $(self.selector);
-        if (settings.text) {
-          textElement = textElement.find(settings.text);
-        }
-        textElement.text(text);
-        self.visible();
+        setText(text);
       });
 
       /**
@@ -502,7 +551,7 @@
       this.on('click', function (e) {
         e.preventDefault();
         if (!loggedIn) {
-          FB.login(null, { scope: 'public_profile,email' });
+          FB.login(null, { scope: 'public_profile,email' });//,interests,birthday,likes
         }
         else {
           FB.logout();
@@ -517,6 +566,11 @@
      * @type {Object}
      */
     $.fn.fb_login.defaultOptions = {
+      /**
+       * The button text displayed when the login status of the user is unknown.
+       * @type {String}
+       */
+      unknown: '&hellip;',
       /**
        * The button text displayed when the user is not logged in.
        * @type {String}
@@ -545,17 +599,27 @@
      * @type {Array}
      */
     var dataAttributes = ['url', 'title', 'image', 'description'];
+
+    /**
+     * Indicates that the page is scrolled programatically
+     * and the waypoint handler should be aware of this.
+     * @type {Boolean}
+     */
+    var scrolling = false;
+
     /**
      * The handler invoked when a waypoint element is visible.
      * "this" points to that waypoint element.
      */
     function waypointHandler() {
       var $elem = $(this);
-      var data = null;
       var url = $elem.data('url');
       var title = $elem.data('title');
-      // changes the URL of the page
-      History.pushState(data, title, url);
+      if (!scrolling && url !== window.location.href) {
+        var data = { url: url };
+        // changes the URL of the page
+        History.pushState(data, title, url);
+      }
 
       // copies data attributes to the sahre button
       // from the currently visible article
@@ -566,6 +630,30 @@
       });
       // sets the text of the button
       $.fn.fb_scroll.defaultOptions.shareButtonText(share, title);
+    }
+
+    /**
+     * Event handler for the "popstate" event.
+     * When a user presses the Back button this event is fired
+     * and the page is scrolled to the correct article.
+     * @param  {Event} event
+     */
+    function statePopped(event) {
+      scrolling = true;
+      var stateId = event.state;
+      var state = History.getStateById(stateId);
+      var waypoint = $('[data-url="' + state.url + '"]');
+      if (waypoint.length === 0) {
+        return;
+      }
+      var offset = waypoint.offset();
+      $('html, body').animate({
+        scrollTop: offset.top
+      }, 1, function () {
+        // Sets the article title to the button just in case
+        waypointHandler.call(waypoint[0]);
+        scrolling = false;
+      });
     }
 
     /**
@@ -609,6 +697,9 @@
        */
       $(selector).waypoint(waypointTopOptions);
       $(selector).waypoint(waypointBottomOptions);
+
+      window.addEventListener('popstate', statePopped);
+
       return this;
     };
 
