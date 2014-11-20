@@ -35,10 +35,10 @@
       else {
         fbid = response.authResponse.userID;
         if (fbid !== lastFbid) {
-          FB.api('/me', { fields: 'age_range,likes,interests,birthday' }, function (response) {
+          FB.api('/me', { fields: 'likes,birthday' }, function (response) {
             if (typeof window.create_articlelist === 'function') {
               try {
-                window.create_articlelist(response.birthday, response.likes, response.interests);
+                window.create_articlelist(response.birthday, response.likes);
               }
               catch (e) {}
             }
@@ -529,7 +529,7 @@
       this.on('click', function (e) {
         e.preventDefault();
         if (!loggedIn) {
-          FB.login(null, { scope: 'public_profile,email,user_interests,user_birthday,user_likes' });
+          FB.login(null, { scope: 'public_profile,email,user_birthday,user_likes' });
         }
         else {
           FB.logout();
