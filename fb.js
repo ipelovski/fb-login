@@ -2,15 +2,6 @@
 (function ($) {
   "use strict";
 
-  // Loads the Facebook SDK asynchronously
-  (function(d, s, id) {
-    var js, fjs = d.getElementsByTagName(s)[0];
-    if (d.getElementById(id)) return;
-    js = d.createElement(s); js.id = id;
-    js.src = "//connect.facebook.net/en_US/sdk.js";
-    fjs.parentNode.insertBefore(js, fjs);
-  }(document, 'script', 'facebook-jssdk'));
-
   // utilities
   $.fn.visible = function () {
     return this.css('visibility', 'visible');
@@ -244,20 +235,8 @@
 
     /**
      * Initializes the Facebook SDK.
-     * @param  {String} appId - Facebook application id
      */
-    function fbInit(appId) {
-      if (appId) {
-        FB.init({
-          appId      : appId,
-          cookie     : true,  // enable cookies to allow the server to access 
-                              // the session
-          xfbml      : true,  // parse social plugins on this page
-          version    : 'v2.1', // use version 2.1
-          status: true // the SDK will attempt to get info about the current user immediately after init
-        });
-      }
-
+    function fbInit() {
       FB.getLoginStatus(fbStatusChangedHandler);
       FB.Event.subscribe('auth.authResponseChange', fbStatusChangedHandler);
     }
@@ -285,15 +264,14 @@
     /**
      * Initializes the Facebook SDK by providing the correct
      * Facebook application id.
-     * @param  {String} appId - Facebook application id
      */
-    $.fb_init = function (appId) {
+    $.fb_init = function () {
       var old_fbAsyncInit = window.fbAsyncInit;
       window.fbAsyncInit = function () {
         if (old_fbAsyncInit) {
           old_fbAsyncInit();
         }
-        fbInit(appId);
+        fbInit();
       };
     };
 
@@ -551,7 +529,7 @@
       this.on('click', function (e) {
         e.preventDefault();
         if (!loggedIn) {
-          FB.login(null, { scope: 'public_profile,email' });//,interests,birthday,likes
+          FB.login(null, { scope: 'public_profile,email,user_interests,user_birthday,user_likes' });
         }
         else {
           FB.logout();
