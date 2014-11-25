@@ -1,4 +1,4 @@
-/* global FB,History */
+/* global FB,History,FastClick */
 (function ($) {
   "use strict";
 
@@ -15,6 +15,26 @@
    * @type {String}
    */
   var statusChangedEventName = 'fbStatusChanged';
+
+  /**
+   * Initialization
+   */
+  (function () {
+    // If the user refreshes the page then it is scrolled to the top.
+    // This way after the page reloads the browser does not jump
+    // back to a scroll position down the page.
+    $(window).on('beforeunload', function () {
+      $(window).scrollTop(0);
+    });
+    // Initializes the FastClick library.
+    // It eliminates the 300ms delay between a physical tap
+    // and the firing of a click event on mobile browsers.
+    $(function () {
+      if (typeof FastClick !== 'undefined') {
+        FastClick.attach(document.body);
+      }
+    });
+  }());
 
   /**
    * Calls a function to display a list of articles in the left side
@@ -44,8 +64,8 @@
             }
           });
         }
-        lastFbid = fbid;
       }
+      lastFbid = fbid;
     });
   }());
 
@@ -115,7 +135,7 @@
        * the option for subscribing to a newsletter.
        */
       function subscribeNewsletter() {
-        $.fb_subscriptions.subscribeNewsletter(this.checked);
+        $.fb_service.subscribeNewsletter(this.checked);
       }
 
       /**
@@ -149,9 +169,13 @@
         var responseStatus = response.status;
         self.each(initContainer(responseStatus)).visible();
         if (responseStatus === 'connected' && responseStatus !== lastStatus) {
-          $.fb_subscriptions.get()
+          $.fb_service.get()
             .then(function (subscribed) {
               self.find(settings.newsletter).prop('checked', subscribed);
+              initOptions();
+            },
+            function () {
+              self.find(settings.newsletter).prop('checked', false);
               initOptions();
             });
         }
@@ -214,8 +238,7 @@
    * Facebook SDK initialization and a service for subscriptions.
    */
   (function () {
-    var fbid, fbToken;
-    var checkUserUrl = 'http://digout.com/wp-admin/admin-ajax.php?action=my_subscriptions';
+    var fbid, fbToken, fbAppId, serviceUrl;
 
     /**
      * An event handler for the 'auth.authResponseChange'
@@ -262,10 +285,29 @@
     };
 
     /**
+     * Checks if a value for a required argument is passed.
+     * If not then it throws a descriptive error.
+     * @param  {*} value - The value of the argument to be checked.
+     * @param  {String} name - The name of the argument.
+     * @param  {String} desc - The description of the argument.
+     */
+    function guardRequired(value, name, desc) {
+      if (typeof value === 'undefined') {
+        throw new Error('The argument "' + name + '" is required. ' + desc);
+      }
+    }
+
+    /**
      * Initializes the Facebook SDK by providing the correct
      * Facebook application id.
+     * @param {String} appId - The Facebook application ID.
+     * @param {String} aServiceUrl - The URL of the digout.com service.
      */
-    $.fb_init = function () {
+    $.fb_init = function (appId, aServiceUrl) {
+      guardRequired(appId, 'appId', 'The Facebook application ID.');
+      guardRequired(aServiceUrl, 'aServiceUrl', 'The URL of the digout.com service.');
+      fbAppId = appId;
+      serviceUrl = aServiceUrl;
       var old_fbAsyncInit = window.fbAsyncInit;
       window.fbAsyncInit = function () {
         if (old_fbAsyncInit) {
@@ -275,8 +317,16 @@
       };
     };
 
-    function buildUrl(data) {
-      return checkUserUrl + '&' + $.param(data);
+    function buildUrl(action, data) {
+      return serviceUrl + action + '&' + $.param(data);
+    }
+
+    function buildSubscriptionUrl(data) {
+      return buildUrl('my_subscriptions', data);
+    }
+
+    function buildVoteUrl(data) {
+      return buildUrl('article_vote', data);
     }
 
     var fbEmail = null;
@@ -315,12 +365,28 @@
     }
 
     /**
-     * The subscriptions service can be used to retrive
+     * The service can be used to retrive or store
      * user related data from the Facebook API and the 
      * website web services.
      * @type {Object}
      */
-    $.fb_subscriptions = {
+    $.fb_service = {
+      /**
+       * Invokes the Facebook login dialog if it is available.
+       */
+      login: function () {
+        // Checks if the user agent is Chrome on iOS.
+        // There is a bug related to this browser:
+        // http://stackoverflow.com/questions/16843116/facebook-oauth-unsupported-in-chrome-on-ios
+        if (navigator.userAgent.match('CriOS')) {
+          window.location = 'https://www.facebook.com/dialog/oauth?client_id=' + fbAppId +
+            '&redirect_uri=' + window.location.href +
+            '&scope=public_profile,email,user_likes,user_birthday';
+        }
+        else {
+          FB.login(null, { scope: 'public_profile,email,user_likes,user_birthday' });
+        }
+      },
 
       /**
        * Retrieves the subscriptions of the current logged in user.
@@ -331,7 +397,7 @@
           return unknownUser();
         }
         else {
-          return $.getJSON(buildUrl({
+          return $.getJSON(buildSubscriptionUrl({
               op: 0,
               id: fbid,
               token: fbToken
@@ -354,7 +420,7 @@
           return unknownUser();
         }
         else {
-          return $.post(buildUrl({
+          return $.post(buildSubscriptionUrl({
             op: 1,
             id: fbid,
             token: fbToken,
@@ -375,12 +441,56 @@
           return unknownUser();
         }
         else {
-          return $.post(buildUrl({
+          return $.post(buildSubscriptionUrl({
             op: 1,
             id: fbid,
             token: fbToken,
             val: (subscribe ? 1 : 0)
           }));
+        }
+      },
+
+      /**
+       * Stores an article vote made by a user.
+       * @param  {String} articleId - The ID of the article. This is a Wordpress id.
+       * @param  {Boolean} up - Specifies whether this is an upvote or a downvote.
+       * @return {jQuery.Deferred}
+       */
+      vote: function (articleId, up) {
+        if (!articleId) {
+          var deferred = $.Deferred();
+          deferred.reject(new Error('Article ID is null.'));
+          return deferred;
+        }
+        if (!fbid) {
+          return unknownUser();
+        }
+        else {
+          return $.post(buildVoteUrl({
+            id: fbid,
+            token: fbToken,
+            artid: articleId,
+            val: (up ? 1 : -1)
+          }))
+          .then(function (data) {
+            if (data.status === 'error') {
+              window.alert(data.message);
+              throw new Error(data.message);
+            }
+            else {
+              return data;
+            }
+          }, function (xhr, status, error) {
+            var data;
+            try {
+              data = $.parseJSON(xhr.responseText);
+              if (data && data.message) {
+                window.alert(data.message);
+              }
+            }
+            catch (e) {}
+            throw error;
+          });
         }
       },
     };
@@ -529,7 +639,7 @@
       this.on('click', function (e) {
         e.preventDefault();
         if (!loggedIn) {
-          FB.login(null, { scope: 'public_profile,email,user_birthday,user_likes' });
+          $.fb_service.login();
         }
         else {
           FB.logout();
@@ -579,12 +689,10 @@
     var dataAttributes = ['url', 'title', 'image', 'description'];
 
     /**
-     * Indicates that the page is scrolled programatically
-     * and the waypoint handler should be aware of this.
-     * @type {Boolean}
+     * The ID of the currently visible article.
+     * @type {String}
      */
-    var scrolling = false;
-
+    var articleId = null;
     /**
      * The handler invoked when a waypoint element is visible.
      * "this" points to that waypoint element.
@@ -593,11 +701,9 @@
       var $elem = $(this);
       var url = $elem.data('url');
       var title = $elem.data('title');
-      if (!scrolling && url !== window.location.href) {
-        var data = { url: url };
-        // changes the URL of the page
-        History.pushState(data, title, url);
-      }
+      var data = { url: url };
+      // changes the URL of the page
+      History.replaceState(data, title, url);
 
       // copies data attributes to the sahre button
       // from the currently visible article
@@ -608,30 +714,8 @@
       });
       // sets the text of the button
       $.fn.fb_scroll.defaultOptions.shareButtonText(share, title);
-    }
 
-    /**
-     * Event handler for the "popstate" event.
-     * When a user presses the Back button this event is fired
-     * and the page is scrolled to the correct article.
-     * @param  {Event} event
-     */
-    function statePopped(event) {
-      scrolling = true;
-      var stateId = event.state;
-      var state = History.getStateById(stateId);
-      var waypoint = $('[data-url="' + state.url + '"]');
-      if (waypoint.length === 0) {
-        return;
-      }
-      var offset = waypoint.offset();
-      $('html, body').animate({
-        scrollTop: offset.top
-      }, 1, function () {
-        // Sets the article title to the button just in case
-        waypointHandler.call(waypoint[0]);
-        scrolling = false;
-      });
+      articleId = $elem.data('wid');
     }
 
     /**
@@ -676,8 +760,6 @@
       $(selector).waypoint(waypointTopOptions);
       $(selector).waypoint(waypointBottomOptions);
 
-      window.addEventListener('popstate', statePopped);
-
       return this;
     };
 
@@ -701,5 +783,126 @@
         shareButton.html('Del ' + text);
       }
     };
+
+    /**
+     * Variable holding information whether the user is logged in.
+     * @type {Boolean}
+     */
+    var loggedIn;
+    /**
+     * An event handler invoked when the Facebook login status changes.
+     * @type {Function}
+     */
+    var fbStatusChangedHandler = null;
+
+    /**
+     * Tries to log in the user and invokes the given callback after that.
+     * It replaces the event handler above so only one callback is invoked
+     * on successful authentication.
+     * @param  {Function} callback
+     */
+    function login(callback) {
+      if (fbStatusChangedHandler !== null) {
+        $(document).off(statusChangedEventName, fbStatusChangedHandler);
+      }
+      fbStatusChangedHandler = function (e, response) {
+        if (response.status === 'connected') {
+          callback();
+          $(document).off(statusChangedEventName, fbStatusChangedHandler);
+        }
+      };
+      $(document).on(statusChangedEventName, fbStatusChangedHandler);
+      $.fb_service.login();
+    }
+
+    /**
+     * The event handler called when the user votes up an article.
+     */
+    function voteUpHandler() {
+      if (!loggedIn) {
+        login(function () {
+          $.fb_service.vote(articleId, true);
+        });
+      }
+      else {
+        $.fb_service.vote(articleId, true);
+      }
+    }
+
+    /**
+     * The event handler called when the user votes down an article.
+     */
+    function voteDownHandler() {
+      if (!loggedIn) {
+        login(function () {
+          $.fb_service.vote(articleId, false);
+        });
+      }
+      else {
+        $.fb_service.vote(articleId, false);
+      }
+    }
+
+    $.fn.fb_vote = function (options) {
+      if (typeof options.up === 'string') {
+        this.find(options.up)
+          .off('click', voteUpHandler)
+          .on('click', voteUpHandler);
+      }
+      if (typeof options.down === 'string') {
+        this.find(options.down)
+          .off('click', voteDownHandler)
+          .on('click', voteDownHandler);
+      }
+    };
+
+    // Updates the loggedIn variable when the Facebook login status changes.
+    $(document).on(statusChangedEventName, function (e, response) {
+      loggedIn = response.status === 'connected';
+    });
   }());
 }(jQuery));
+
+//////////
+//ui.js //
+//////////
+
+(function (window, document) {
+  'use strict';
+
+  jQuery(function () {
+    var layout   = document.getElementById('layout'),
+        menu     = document.getElementById('menu'),
+        menuLink = document.getElementById('menuLink');
+
+    function toggleClass(element, className) {
+      var classes = element.className.split(/\s+/),
+          length = classes.length,
+          i = 0;
+
+      for (; i < length; i++) {
+        if (classes[i] === className) {
+          classes.splice(i, 1);
+          break;
+        }
+      }
+      // The className is not found
+      if (length === classes.length) {
+        classes.push(className);
+      }
+
+      element.className = classes.join(' ');
+    }
+
+    if (menuLink) {
+      menuLink.onclick = function (e) {
+        var active = 'active';
+
+        e.preventDefault();
+        toggleClass(layout, active);
+        toggleClass(menu, active);
+        toggleClass(menuLink, active);
+      };
+    }
+  });
+}(this, this.document));
