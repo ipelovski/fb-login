@@ -1,4 +1,4 @@
-/* global FB,History,FastClick */
+/* global FB,History,FastClick,ga */
 (function ($) {
   "use strict";
 
@@ -693,6 +693,14 @@
      * @type {String}
      */
     var articleId = null;
+
+    /**
+     * A collection of articles already tracked by google analytics.
+     * Contains the IDs of the articles.
+     * @type {Array}
+     */
+    var trackedArticles = [];
+
     /**
      * The handler invoked when a waypoint element is visible.
      * "this" points to that waypoint element.
@@ -716,6 +724,26 @@
       $.fn.fb_scroll.defaultOptions.shareButtonText(share, title);
 
       articleId = $elem.data('wid');
+
+      // Checks for the top article.
+      // It is already tracked on page load so it is skipped here.
+      if (trackedArticles.length === 0) {
+        trackedArticles.push(articleId);
+      }
+      else {
+        // Checks whether the article is not already tracked.
+        if (typeof ga !== 'undefined' &&
+          trackedArticles.indexOf(articleId) === -1) {
+
+          trackedArticles.push(articleId);
+          var page = window.location.pathname + window.location.search;
+          ga('send', {
+            'hitType': 'pageview',
+            'page': page,
+            'title': title
+          });
+        }
+      }
     }
 
     /**
@@ -752,13 +780,13 @@
       handler: waypointHandler
     };
 
-    $.fn.fb_scroll = function () {
+    $.fn.fb_scroll = function (options) {
       var selector = this.selector;
       /**
        * Initialzes the waypoint plugin with the plugin selector.
        */
-      $(selector).waypoint(waypointTopOptions);
-      $(selector).waypoint(waypointBottomOptions);
+      $(selector).waypoint($.extend({}, waypointTopOptions, options));
+      $(selector).waypoint($.extend({}, waypointBottomOptions, options));
 
       return this;
     };

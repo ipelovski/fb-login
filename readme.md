@@ -6,7 +6,7 @@ The web page will contain some widgets. These widgets should be locked or inacce
 Solution
 ========
 
-The solution consists of jQuery plugins, used for creating components, and a special jQuery event. The code of the components is placed in file `fb-login.js`, and their styling in `fb-login.css` and `sc-btn.css` (see below). The web page also should contain JavaScript initialization code in order to set up the correct Facebook application ID and create the necessary components.
+The solution consists of jQuery plugins, used for creating components, and a special jQuery event. The code of the components is placed in file `fb.js`, and their styling in `fb-login.css` and `sc-btn.css` (see below). The web page also should contain JavaScript initialization code in order to set up the correct Facebook application ID and create the necessary components.
 
 Example:
 ```
